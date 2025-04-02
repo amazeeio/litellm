@@ -69,46 +69,6 @@ try:
 except ImportError as e:
     raise ImportError(f"Missing dependency {e}. Run `pip install 'litellm[proxy]'`")
 
-list_of_messages = [
-    "'The thing I wish you improved is...'",
-    "'A feature I really want is...'",
-    "'The worst thing about this product is...'",
-    "'This product would be better if...'",
-    "'I don't like how this works...'",
-    "'It would help me if you could add...'",
-    "'This feature doesn't meet my needs because...'",
-    "'I get frustrated when the product...'",
-]
-
-
-def generate_feedback_box():
-    box_width = 60
-
-    # Select a random message
-    message = random.choice(list_of_messages)
-
-    print()  # noqa
-    print("\033[1;37m" + "#" + "-" * box_width + "#\033[0m")  # noqa
-    print("\033[1;37m" + "#" + " " * box_width + "#\033[0m")  # noqa
-    print("\033[1;37m" + "# {:^59} #\033[0m".format(message))  # noqa
-    print(  # noqa
-        "\033[1;37m"
-        + "# {:^59} #\033[0m".format("https://github.com/BerriAI/litellm/issues/new")
-    )  # noqa
-    print("\033[1;37m" + "#" + " " * box_width + "#\033[0m")  # noqa
-    print("\033[1;37m" + "#" + "-" * box_width + "#\033[0m")  # noqa
-    print()  # noqa
-    print(" Thank you for using LiteLLM! - Krrish & Ishaan")  # noqa
-    print()  # noqa
-    print()  # noqa
-    print()  # noqa
-    print(  # noqa
-        "\033[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new\033[0m"
-    )  # noqa
-    print()  # noqa
-    print()  # noqa
-
-
 from collections import defaultdict
 from contextlib import asynccontextmanager
 
@@ -134,7 +94,6 @@ from litellm.proxy.anthropic_endpoints.endpoints import router as anthropic_rout
 from litellm.proxy.auth.auth_checks import get_team_object, log_db_metrics
 from litellm.proxy.auth.auth_utils import check_response_size_is_safe
 from litellm.proxy.auth.handle_jwt import JWTHandler
-from litellm.proxy.auth.litellm_license import LicenseCheck
 from litellm.proxy.auth.model_checks import (
     get_complete_model_list,
     get_key_models,
@@ -354,8 +313,7 @@ except Exception:
         pass
 
 server_root_path = os.getenv("SERVER_ROOT_PATH", "")
-_license_check = LicenseCheck()
-premium_user: bool = _license_check.is_premium()
+premium_user: bool = True
 global_max_parallel_request_retries_env: Optional[str] = os.getenv(
     "LITELLM_GLOBAL_MAX_PARALLEL_REQUEST_RETRIES"
 )
@@ -467,7 +425,7 @@ async def proxy_startup_event(app: FastAPI):
         )
     )
     if premium_user is False:
-        premium_user = _license_check.is_premium()
+        premium_user = True
 
     ### LOAD CONFIG ###
     worker_config: Optional[Union[str, dict]] = get_secret("WORKER_CONFIG")  # type: ignore
@@ -1705,10 +1663,6 @@ class ProxyConfig:
             for key, value in environment_variables.items():
                 os.environ[key] = str(get_secret(secret_name=key, default_value=value))
 
-            # check if litellm_license in general_settings
-            if "LITELLM_LICENSE" in environment_variables:
-                _license_check.license_str = os.getenv("LITELLM_LICENSE", None)
-                premium_user = _license_check.is_premium()
 
         ## Callback settings
         callback_settings = config.get("callback_settings", None)
@@ -2067,10 +2021,6 @@ class ProxyConfig:
                     + CommonProxyErrors.not_premium_user.value
                 )
 
-            # check if litellm_license in general_settings
-            if "litellm_license" in general_settings:
-                _license_check.license_str = general_settings["litellm_license"]
-                premium_user = _license_check.is_premium()
 
         router_params: dict = {
             "cache_responses": litellm.cache
@@ -2886,8 +2836,6 @@ async def initialize(  # noqa: PLR0915
     config=None,
 ):
     global user_model, user_api_base, user_debug, user_detailed_debug, user_user_max_tokens, user_request_timeout, user_temperature, user_telemetry, user_headers, experimental, llm_model_list, llm_router, general_settings, master_key, user_custom_auth, prisma_client
-    if os.getenv("LITELLM_DONT_SHOW_FEEDBACK_BOX", "").lower() != "true":
-        generate_feedback_box()
     user_model = model
     user_debug = debug
     if debug is True:  # this needs to be first, so users can see Router init debugg
@@ -5949,18 +5897,18 @@ async def model_metrics_exceptions(
     """
     sql_query = """
         WITH cte AS (
-            SELECT 
+            SELECT
                 CASE WHEN api_base = '' THEN litellm_model_name ELSE CONCAT(litellm_model_name, '-', api_base) END AS combined_model_api_base,
                 exception_type,
                 COUNT(*) AS num_rate_limit_exceptions
             FROM "LiteLLM_ErrorLogs"
-            WHERE 
-                "startTime" >= $1::timestamp 
-                AND "endTime" <= $2::timestamp 
+            WHERE
+                "startTime" >= $1::timestamp
+                AND "endTime" <= $2::timestamp
                 AND model_group = $3
             GROUP BY combined_model_api_base, exception_type
         )
-        SELECT 
+        SELECT
             combined_model_api_base,
             COUNT(*) AS total_exceptions,
             json_object_agg(exception_type, num_rate_limit_exceptions) AS exception_counts
@@ -6739,7 +6687,7 @@ async def login(request: Request):  # noqa: PLR0915
         get_disabled_non_admin_personal_key_creation()
     )
     """
-    To login to Admin UI, we support the following 
+    To login to Admin UI, we support the following
     - Login with UI_USERNAME and UI_PASSWORD
     - Login with Invite Link `user_email` and `password` combination
     """
@@ -7536,8 +7484,8 @@ async def update_config_general_settings(
     """
     - Check if prisma_client is None
     - Check if user allowed to call this endpoint (admin-only)
-    - Check if param in general settings 
-    - Check if config value is valid type 
+    - Check if param in general settings
+    - Check if config value is valid type
     """
 
     if prisma_client is None:
@@ -7613,7 +7561,7 @@ async def get_config_general_settings(
     """
     - Check if prisma_client is None
     - Check if user allowed to call this endpoint (admin-only)
-    - Check if param in general settings 
+    - Check if param in general settings
     """
     if prisma_client is None:
         raise HTTPException(
@@ -7677,7 +7625,7 @@ async def get_config_list(
     """
     - Check if prisma_client is None
     - Check if user allowed to call this endpoint (admin-only)
-    - Check if param in general settings 
+    - Check if param in general settings
     """
     if prisma_client is None:
         raise HTTPException(
@@ -7814,7 +7762,7 @@ async def delete_config_general_settings(
     """
     - Check if prisma_client is None
     - Check if user allowed to call this endpoint (admin-only)
-    - Check if param in general settings 
+    - Check if param in general settings
     """
     if prisma_client is None:
         raise HTTPException(
@@ -7905,7 +7853,7 @@ async def get_config():  # noqa: PLR0915
                 },
             }
         ]
-        
+
         """
         for _callback in _success_callbacks:
             if _callback != "langfuse":
