@@ -52,7 +52,9 @@ class OpenMeterLogger(CustomLogger):
     def _common_logic(self, kwargs: dict, response_obj):
         call_id = response_obj.get("id", kwargs.get("litellm_call_id"))
         dt = get_utc_datetime().isoformat()
-        cost = kwargs.get("response_cost", None)
+        cost = kwargs.get("response_cost", 0)
+        if cost is None:
+            cost = 0
         model = kwargs.get("model")
         usage = {}
         if (
@@ -65,9 +67,9 @@ class OpenMeterLogger(CustomLogger):
                 "total_tokens": response_obj["usage"].get("total_tokens"),
             }
 
-        subject = (kwargs.get("user", None),)  # end-user passed in via 'user' param
-        if not subject:
-            raise Exception("OpenMeter: user is required")
+        subject = kwargs.get("user", "default_user") # end-user passed in via 'user' param
+        if subject is None:
+            subject = "default_user"
 
         return {
             "specversion": "1.0",
@@ -101,7 +103,7 @@ class OpenMeterLogger(CustomLogger):
                 headers=_headers,
             )
         except httpx.HTTPStatusError as e:
-            raise Exception(f"OpenMeter logging error: {e.response.text}")
+            raise Exception(f"OpenMeter logging error: {e.response.text}, data was {json.dumps(_data)}")
         except Exception as e:
             raise e
 
@@ -127,6 +129,6 @@ class OpenMeterLogger(CustomLogger):
                 headers=_headers,
             )
         except httpx.HTTPStatusError as e:
-            raise Exception(f"OpenMeter logging error: {e.response.text}")
+            raise Exception(f"OpenMeter logging error: {e.response.text}, data was {json.dumps(_data)}")
         except Exception as e:
             raise e
