@@ -24,18 +24,6 @@ class PrometheusLogger(CustomLogger):
         try:
             from prometheus_client import Counter, Gauge, Histogram
 
-            from litellm.proxy.proxy_server import CommonProxyErrors, premium_user
-
-            if premium_user is not True:
-                verbose_logger.warning(
-                    f"🚨🚨🚨 Prometheus Metrics is on LiteLLM Enterprise\n🚨 {CommonProxyErrors.not_premium_user.value}"
-                )
-                self.litellm_not_a_premium_user_metric = Counter(
-                    name="litellm_not_a_premium_user_metric",
-                    documentation=f"🚨🚨🚨 Prometheus Metrics is on LiteLLM Enterprise. 🚨 {CommonProxyErrors.not_premium_user.value}",
-                )
-                return
-
             self.litellm_proxy_failed_requests_metric = Counter(
                 name="litellm_proxy_failed_requests_metric",
                 documentation="Total number of failed responses from proxy - the client did not get a success response from litellm proxy",
