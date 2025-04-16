@@ -76,6 +76,8 @@ RUN chmod +x docker/entrypoint.sh
 RUN chmod +x docker/prod_entrypoint.sh
 EXPOSE 4000/tcp
 
+ENV DEMO=true
+
 # # Set your entrypoint and command
 
 ENTRYPOINT ["docker/prod_entrypoint.sh"]
