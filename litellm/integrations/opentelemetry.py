@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, cast
 
 import litellm
 from litellm._logging import verbose_logger
@@ -23,10 +23,10 @@ if TYPE_CHECKING:
     )
     from litellm.proxy.proxy_server import UserAPIKeyAuth as _UserAPIKeyAuth
 
-    Span = _Span
-    SpanExporter = _SpanExporter
-    UserAPIKeyAuth = _UserAPIKeyAuth
-    ManagementEndpointLoggingPayload = _ManagementEndpointLoggingPayload
+    Span = Union[_Span, Any]
+    SpanExporter = Union[_SpanExporter, Any]
+    UserAPIKeyAuth = Union[_UserAPIKeyAuth, Any]
+    ManagementEndpointLoggingPayload = Union[_ManagementEndpointLoggingPayload, Any]
 else:
     Span = Any
     SpanExporter = Any
@@ -46,7 +46,6 @@ LITELLM_REQUEST_SPAN_NAME = "litellm_request"
 
 @dataclass
 class OpenTelemetryConfig:
-
     exporter: Union[str, SpanExporter] = "console"
     endpoint: Optional[str] = None
     headers: Optional[str] = None
@@ -64,14 +63,16 @@ class OpenTelemetryConfig:
             InMemorySpanExporter,
         )
 
-        if os.getenv("OTEL_EXPORTER") == "in_memory":
+        exporter=os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", os.getenv("OTEL_EXPORTER", "console"))
+        endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", os.getenv("OTEL_ENDPOINT"))
+        headers=os.getenv("OTEL_EXPORTER_OTLP_HEADERS", os.getenv("OTEL_HEADERS"))  # example: OTEL_HEADERS=x-honeycomb-team=B85YgLm96***"
+
+        if exporter == "in_memory":
             return cls(exporter=InMemorySpanExporter())
         return cls(
-            exporter=os.getenv("OTEL_EXPORTER", "console"),
-            endpoint=os.getenv("OTEL_ENDPOINT"),
-            headers=os.getenv(
-                "OTEL_HEADERS"
-            ),  # example: OTEL_HEADERS=x-honeycomb-team=B85YgLm96***"
+            exporter=exporter,
+            endpoint=endpoint,
+            headers=headers,  # example: OTEL_HEADERS=x-honeycomb-team=B85YgLm96***"
         )
 
 
@@ -154,7 +155,6 @@ class OpenTelemetry(CustomLogger):
         end_time: Optional[Union[datetime, float]] = None,
         event_metadata: Optional[dict] = None,
     ):
-
         from opentelemetry import trace
         from opentelemetry.trace import Status, StatusCode
 
@@ -215,7 +215,6 @@ class OpenTelemetry(CustomLogger):
         end_time: Optional[Union[float, datetime]] = None,
         event_metadata: Optional[dict] = None,
     ):
-
         from opentelemetry import trace
         from opentelemetry.trace import Status, StatusCode
 
@@ -353,9 +352,9 @@ class OpenTelemetry(CustomLogger):
         """
         from opentelemetry import trace
 
-        standard_callback_dynamic_params: Optional[StandardCallbackDynamicParams] = (
-            kwargs.get("standard_callback_dynamic_params")
-        )
+        standard_callback_dynamic_params: Optional[
+            StandardCallbackDynamicParams
+        ] = kwargs.get("standard_callback_dynamic_params")
         if not standard_callback_dynamic_params:
             return
 
@@ -420,7 +419,7 @@ class OpenTelemetry(CustomLogger):
                 if not function:
                     continue
 
-                prefix = f"{SpanAttributes.LLM_REQUEST_FUNCTIONS}.{i}"
+                prefix = f"{SpanAttributes.LLM_REQUEST_FUNCTIONS.value}.{i}"
                 self.safe_set_attribute(
                     span=span,
                     key=f"{prefix}.name",
@@ -476,7 +475,7 @@ class OpenTelemetry(CustomLogger):
                 _value = _function.get(key)
                 if _value:
                     kv_pairs[
-                        f"{SpanAttributes.LLM_COMPLETIONS}.{idx}.function_call.{key}"
+                        f"{SpanAttributes.LLM_COMPLETIONS.value}.{idx}.function_call.{key}"
                     ] = _value
 
         return kv_pairs
@@ -528,21 +527,21 @@ class OpenTelemetry(CustomLogger):
             if kwargs.get("model"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_REQUEST_MODEL,
+                    key=SpanAttributes.LLM_REQUEST_MODEL.value,
                     value=kwargs.get("model"),
                 )
 
             # The LLM request type
             self.safe_set_attribute(
                 span=span,
-                key=SpanAttributes.LLM_REQUEST_TYPE,
+                key=SpanAttributes.LLM_REQUEST_TYPE.value,
                 value=standard_logging_payload["call_type"],
             )
 
             # The Generative AI Provider: Azure, OpenAI, etc.
             self.safe_set_attribute(
                 span=span,
-                key=SpanAttributes.LLM_SYSTEM,
+                key=SpanAttributes.LLM_SYSTEM.value,
                 value=litellm_params.get("custom_llm_provider", "Unknown"),
             )
 
@@ -550,7 +549,7 @@ class OpenTelemetry(CustomLogger):
             if optional_params.get("max_tokens"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_REQUEST_MAX_TOKENS,
+                    key=SpanAttributes.LLM_REQUEST_MAX_TOKENS.value,
                     value=optional_params.get("max_tokens"),
                 )
 
@@ -558,7 +557,7 @@ class OpenTelemetry(CustomLogger):
             if optional_params.get("temperature"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_REQUEST_TEMPERATURE,
+                    key=SpanAttributes.LLM_REQUEST_TEMPERATURE.value,
                     value=optional_params.get("temperature"),
                 )
 
@@ -566,20 +565,20 @@ class OpenTelemetry(CustomLogger):
             if optional_params.get("top_p"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_REQUEST_TOP_P,
+                    key=SpanAttributes.LLM_REQUEST_TOP_P.value,
                     value=optional_params.get("top_p"),
                 )
 
             self.safe_set_attribute(
                 span=span,
-                key=SpanAttributes.LLM_IS_STREAMING,
+                key=SpanAttributes.LLM_IS_STREAMING.value,
                 value=str(optional_params.get("stream", False)),
             )
 
             if optional_params.get("user"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_USER,
+                    key=SpanAttributes.LLM_USER.value,
                     value=optional_params.get("user"),
                 )
 
@@ -593,7 +592,7 @@ class OpenTelemetry(CustomLogger):
             if response_obj and response_obj.get("model"):
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_RESPONSE_MODEL,
+                    key=SpanAttributes.LLM_RESPONSE_MODEL.value,
                     value=response_obj.get("model"),
                 )
 
@@ -601,21 +600,21 @@ class OpenTelemetry(CustomLogger):
             if usage:
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_USAGE_TOTAL_TOKENS,
+                    key=SpanAttributes.LLM_USAGE_TOTAL_TOKENS.value,
                     value=usage.get("total_tokens"),
                 )
 
                 # The number of tokens used in the LLM response (completion).
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_USAGE_COMPLETION_TOKENS,
+                    key=SpanAttributes.LLM_USAGE_COMPLETION_TOKENS.value,
                     value=usage.get("completion_tokens"),
                 )
 
                 # The number of tokens used in the LLM prompt.
                 self.safe_set_attribute(
                     span=span,
-                    key=SpanAttributes.LLM_USAGE_PROMPT_TOKENS,
+                    key=SpanAttributes.LLM_USAGE_PROMPT_TOKENS.value,
                     value=usage.get("prompt_tokens"),
                 )
 
@@ -637,7 +636,7 @@ class OpenTelemetry(CustomLogger):
                     if prompt.get("role"):
                         self.safe_set_attribute(
                             span=span,
-                            key=f"{SpanAttributes.LLM_PROMPTS}.{idx}.role",
+                            key=f"{SpanAttributes.LLM_PROMPTS.value}.{idx}.role",
                             value=prompt.get("role"),
                         )
 
@@ -646,7 +645,7 @@ class OpenTelemetry(CustomLogger):
                             prompt["content"] = str(prompt.get("content"))
                         self.safe_set_attribute(
                             span=span,
-                            key=f"{SpanAttributes.LLM_PROMPTS}.{idx}.content",
+                            key=f"{SpanAttributes.LLM_PROMPTS.value}.{idx}.content",
                             value=prompt.get("content"),
                         )
             #############################################
@@ -658,14 +657,14 @@ class OpenTelemetry(CustomLogger):
                         if choice.get("finish_reason"):
                             self.safe_set_attribute(
                                 span=span,
-                                key=f"{SpanAttributes.LLM_COMPLETIONS}.{idx}.finish_reason",
+                                key=f"{SpanAttributes.LLM_COMPLETIONS.value}.{idx}.finish_reason",
                                 value=choice.get("finish_reason"),
                             )
                         if choice.get("message"):
                             if choice.get("message").get("role"):
                                 self.safe_set_attribute(
                                     span=span,
-                                    key=f"{SpanAttributes.LLM_COMPLETIONS}.{idx}.role",
+                                    key=f"{SpanAttributes.LLM_COMPLETIONS.value}.{idx}.role",
                                     value=choice.get("message").get("role"),
                                 )
                             if choice.get("message").get("content"):
@@ -677,7 +676,7 @@ class OpenTelemetry(CustomLogger):
                                     )
                                 self.safe_set_attribute(
                                     span=span,
-                                    key=f"{SpanAttributes.LLM_COMPLETIONS}.{idx}.content",
+                                    key=f"{SpanAttributes.LLM_COMPLETIONS.value}.{idx}.content",
                                     value=choice.get("message").get("content"),
                                 )
 
@@ -722,7 +721,6 @@ class OpenTelemetry(CustomLogger):
         span.set_attribute(key, primitive_value)
 
     def set_raw_request_attributes(self, span: Span, kwargs, response_obj):
-
         kwargs.get("optional_params", {})
         litellm_params = kwargs.get("litellm_params", {}) or {}
         custom_llm_provider = litellm_params.get("custom_llm_provider", "Unknown")
@@ -843,12 +841,14 @@ class OpenTelemetry(CustomLogger):
             headers=dynamic_headers or self.OTEL_HEADERS
         )
 
-        if isinstance(self.OTEL_EXPORTER, SpanExporter):
+        if hasattr(
+            self.OTEL_EXPORTER, "export"
+        ):  # Check if it has the export method that SpanExporter requires
             verbose_logger.debug(
                 "OpenTelemetry: intiializing SpanExporter. Value of OTEL_EXPORTER: %s",
                 self.OTEL_EXPORTER,
             )
-            return SimpleSpanProcessor(self.OTEL_EXPORTER)
+            return SimpleSpanProcessor(cast(SpanExporter, self.OTEL_EXPORTER))
 
         if self.OTEL_EXPORTER == "console":
             verbose_logger.debug(
@@ -856,7 +856,7 @@ class OpenTelemetry(CustomLogger):
                 self.OTEL_EXPORTER,
             )
             return BatchSpanProcessor(ConsoleSpanExporter())
-        elif self.OTEL_EXPORTER == "otlp_http":
+        elif self.OTEL_EXPORTER == "otlp_http" or self.OTEL_EXPORTER == "http/protobuf" or self.OTEL_EXPORTER == "http/json":
             verbose_logger.debug(
                 "OpenTelemetry: intiializing http exporter. Value of OTEL_EXPORTER: %s",
                 self.OTEL_EXPORTER,
@@ -866,7 +866,7 @@ class OpenTelemetry(CustomLogger):
                     endpoint=self.OTEL_ENDPOINT, headers=_split_otel_headers
                 ),
             )
-        elif self.OTEL_EXPORTER == "otlp_grpc":
+        elif self.OTEL_EXPORTER == "otlp_grpc" or self.OTEL_EXPORTER == "grpc":
             verbose_logger.debug(
                 "OpenTelemetry: intiializing grpc exporter. Value of OTEL_EXPORTER: %s",
                 self.OTEL_EXPORTER,
@@ -907,7 +907,6 @@ class OpenTelemetry(CustomLogger):
         logging_payload: ManagementEndpointLoggingPayload,
         parent_otel_span: Optional[Span] = None,
     ):
-
         from opentelemetry import trace
         from opentelemetry.trace import Status, StatusCode
 
@@ -961,7 +960,6 @@ class OpenTelemetry(CustomLogger):
         logging_payload: ManagementEndpointLoggingPayload,
         parent_otel_span: Optional[Span] = None,
     ):
-
         from opentelemetry import trace
         from opentelemetry.trace import Status, StatusCode
 
