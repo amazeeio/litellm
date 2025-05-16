@@ -12,8 +12,7 @@ WORKDIR /app
 USER root
 
 # Install build dependencies
-RUN apk update && \
-    apk add --no-cache gcc python3-dev openssl openssl-dev
+RUN apk add --no-cache gcc python3-dev openssl openssl-dev
 
 
 RUN pip install --upgrade pip && \

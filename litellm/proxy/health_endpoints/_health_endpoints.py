@@ -14,12 +14,14 @@ from litellm.constants import HEALTH_CHECK_TIMEOUT_SECONDS
 from litellm.proxy._types import (
     AlertType,
     CallInfo,
+    Litellm_EntityType,
     ProxyErrorTypes,
     ProxyException,
     UserAPIKeyAuth,
     WebhookEvent,
 )
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
+from litellm.proxy.db.exception_handler import PrismaDBExceptionHandler
 from litellm.proxy.health_check import (
     _clean_endpoint_data,
     _update_litellm_params_for_health_check,
@@ -70,6 +72,7 @@ async def health_services_endpoint(  # noqa: PLR0915
             "email",
             "braintrust",
             "datadog",
+            "generic_api",
         ],
         str,
     ] = fastapi.Query(description="Specify the service being hit."),
@@ -107,6 +110,7 @@ async def health_services_endpoint(  # noqa: PLR0915
             "custom_callback_api",
             "langsmith",
             "datadog",
+            "generic_api",
         ]:
             raise HTTPException(
                 status_code=400,
@@ -118,6 +122,7 @@ async def health_services_endpoint(  # noqa: PLR0915
         if (
             service == "openmeter"
             or service == "braintrust"
+            or service == "generic_api"
             or (service in litellm.success_callback and service != "langfuse")
         ):
             _ = await litellm.acompletion(
@@ -167,6 +172,7 @@ async def health_services_endpoint(  # noqa: PLR0915
                 user_id=user_api_key_dict.user_id,
                 key_alias=user_api_key_dict.key_alias,
                 team_id=user_api_key_dict.team_id,
+                event_group=Litellm_EntityType.KEY,
             )
             await proxy_logging_obj.budget_alerts(
                 type="user_budget",
@@ -250,7 +256,7 @@ async def health_services_endpoint(  # noqa: PLR0915
         if service == "email":
             webhook_event = WebhookEvent(
                 event="key_created",
-                event_group="key",
+                event_group=Litellm_EntityType.KEY,
                 event_message="Test Email Alert",
                 token=user_api_key_dict.token or "",
                 key_alias="Email Test key (This is only a test alert key. DO NOT USE THIS IN PRODUCTION.)",
@@ -381,19 +387,22 @@ async def _db_health_readiness_check():
     global db_health_cache
 
     # Note - Intentionally don't try/except this so it raises an exception when it fails
+    try:
+        # if timedelta is less than 2 minutes return DB Status
+        time_diff = datetime.now() - db_health_cache["last_updated"]
+        if db_health_cache["status"] != "unknown" and time_diff < timedelta(minutes=2):
+            return db_health_cache
 
-    # if timedelta is less than 2 minutes return DB Status
-    time_diff = datetime.now() - db_health_cache["last_updated"]
-    if db_health_cache["status"] != "unknown" and time_diff < timedelta(minutes=2):
+        if prisma_client is None:
+            db_health_cache = {"status": "disconnected", "last_updated": datetime.now()}
+            return db_health_cache
+
+        await prisma_client.health_check()
+        db_health_cache = {"status": "connected", "last_updated": datetime.now()}
         return db_health_cache
-
-    if prisma_client is None:
-        db_health_cache = {"status": "disconnected", "last_updated": datetime.now()}
+    except Exception as e:
+        PrismaDBExceptionHandler.handle_db_exception(e)
         return db_health_cache
-
-    await prisma_client.health_check()
-    db_health_cache = {"status": "connected", "last_updated": datetime.now()}
-    return db_health_cache
 
 
 @router.get(

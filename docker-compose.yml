@@ -31,6 +31,24 @@ services:
     networks:
       - amazeeai
 
+  db:
+    image: postgres:16
+    restart: always
+    container_name: litellm_db
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: llmproxy
+      POSTGRES_PASSWORD: dbpassword9090
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persists Postgres data across container restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d litellm -U llmproxy"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
   prometheus:
     image: prom/prometheus
     volumes:
@@ -39,9 +57,9 @@ services:
     ports:
       - "9090:9090"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
     restart: always
     networks:
       - amazeeai
@@ -50,7 +68,7 @@ volumes:
   prometheus_data:
     driver: local
   postgres_data:
-    name: litellm_postgres_data  # Named volume for Postgres data persistence
+    name: litellm_postgres_data # Named volume for Postgres data persistence
 
 networks:
   amazeeai:

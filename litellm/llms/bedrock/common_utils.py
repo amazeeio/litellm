@@ -51,8 +51,8 @@ class AmazonBedrockGlobalConfig:
             "ap-northeast-1",  # Asia Pacific (Tokyo)
             "ap-northeast-2",  # Asia Pacific (Seoul)
             "ap-northeast-3",  # Asia Pacific (Osaka)
-            "ap-south-1",      # Asia Pacific (Mumbai)
-            "ap-south-2",      # Asia Pacific (Hyderabad)
+            "ap-south-1",  # Asia Pacific (Mumbai)
+            "ap-south-2",  # Asia Pacific (Hyderabad)
             "ap-southeast-1",  # Asia Pacific (Singapore)
             "ap-southeast-2",  # Asia Pacific (Sydney)
         ]
@@ -83,9 +83,10 @@ class AmazonBedrockGlobalConfig:
         Source: https://www.aws-services.info/bedrock.html
         """
         return [
-            "us-east-1",      # US East (N. Virginia)
-            "us-east-2",      # US East (Ohio)
-            "us-west-2",      # US West (Oregon)
+            "us-east-1",  # US East (N. Virginia)
+            "us-east-2",  # US East (Ohio)
+            "us-west-1",  # US West (N. California)
+            "us-west-2",  # US West (Oregon)
             "us-gov-east-1",  # AWS GovCloud (US-East)
             "us-gov-west-1",  # AWS GovCloud (US-West)
         ]
@@ -329,7 +330,6 @@ def get_bedrock_tool_name(response_tool_name: str) -> str:
 
 
 class BedrockModelInfo(BaseLLMModelInfo):
-
     global_config = AmazonBedrockGlobalConfig()
     all_global_regions = global_config.get_all_regions()
 
