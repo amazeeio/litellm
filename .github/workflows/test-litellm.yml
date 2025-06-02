@@ -30,11 +30,6 @@ jobs:
         poetry install --with dev,proxy-dev --extras proxy
         poetry run pip install "pytest-retry==1.6.3"
         poetry run pip install pytest-xdist
-    - name: Setup litellm-enterprise as local package
-      run: |
-        cd enterprise
-        python -m pip install -e .
-        cd ..
     - name: Run tests
       run: |
         poetry run pytest tests/test_litellm -x -vv -n 4 
