@@ -17,11 +17,11 @@ import {
   Modal,
   Form,
   Input,
-  InputNumber,
   Select,
   message,
   Radio,
 } from "antd";
+import NumericalInput from "./shared/numerical_input";
 import { unfurlWildcardModelsInList, getModelDisplayName } from "./key_team_helpers/fetch_available_models_team_key";
 import SchemaFormFields from './common_components/check_openapi_schema';
 import {
@@ -33,6 +33,8 @@ import {
   getPossibleUserRoles,
   userFilterUICall,
 } from "./networking";
+import VectorStoreSelector from "./vector_store_management/VectorStoreSelector";
+import PremiumVectorStoreSelector from "./common_components/PremiumVectorStoreSelector";
 import { Team } from "./key_team_helpers/key_list";
 import TeamDropdown from "./common_components/team_dropdown";
 import { InfoCircleOutlined } from '@ant-design/icons';
@@ -52,8 +54,9 @@ interface CreateKeyProps {
   userRole: string | null;
   accessToken: string;
   data: any[] | null;
-  setData: React.Dispatch<React.SetStateAction<any[] | null>>;
   teams: Team[] | null;
+  addKey: (data: any) => void;
+  premiumUser?: boolean;
 }
 
 interface User {
@@ -92,7 +95,7 @@ const getPredefinedTags = (data: any[] | null) => {
   return uniqueTags;
 }
 
-export const fetchTeamModels = async (userID: string, userRole: string, accessToken: string, teamID: string): Promise<string[]> => {
+export const fetchTeamModels = async (userID: string, userRole: string, accessToken: string, teamID: string | null): Promise<string[]> => {
   try {
     if (userID === null || userRole === null) {
       return [];
@@ -104,7 +107,8 @@ export const fetchTeamModels = async (userID: string, userRole: string, accessTo
         userID,
         userRole,
         true,
-        teamID
+        teamID,
+        true
       );
       let available_model_names = model_available["data"].map(
         (element: { id: string }) => element.id
@@ -149,7 +153,8 @@ const CreateKey: React.FC<CreateKeyProps> = ({
   userRole,
   accessToken,
   data,
-  setData,
+  addKey,
+  premiumUser = false,
 }) => {
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -177,6 +182,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
   const handleCancel = () => {
     setIsModalVisible(false);
     setApiKey(null);
+    setSelectedCreateKeyTeam(null);
     form.resetFields();
   };
 
@@ -262,17 +268,22 @@ const CreateKey: React.FC<CreateKeyProps> = ({
         formValues.metadata = JSON.stringify(metadata);
       }
 
+      // Transform allowed_vector_store_ids into object_permission format
+      if (formValues.allowed_vector_store_ids && formValues.allowed_vector_store_ids.length > 0) {
+        formValues.object_permission = {
+          vector_stores: formValues.allowed_vector_store_ids
+        };
+        // Remove the original field as it's now part of object_permission
+        delete formValues.allowed_vector_store_ids;
+      }
+
       const response = await keyCreateCall(accessToken, userID, formValues);
 
       console.log("key create Response:", response);
       
-      // Update the data state in this component
-      setData((prevData) => (prevData ? [...prevData, response] : [response]));
-      
+      // Add the data to the state in the parent component
       // Also directly update the keys list in AllKeysTable without an API call
-      if (window.addNewKeyToList) {
-        window.addNewKeyToList(response);
-      }
+      addKey(response)
       
       setApiKey(response["key"]);
       setSoftBudget(response["soft_budget"]);
@@ -291,14 +302,14 @@ const CreateKey: React.FC<CreateKeyProps> = ({
   };
 
   useEffect(() => {
-    if (userID && userRole && accessToken && selectedCreateKeyTeam) {
-      fetchTeamModels(userID, userRole, accessToken, selectedCreateKeyTeam.team_id).then((models) => {
-        let allModels = Array.from(new Set([...selectedCreateKeyTeam.models, ...models]));
+    if (userID && userRole && accessToken) {
+      fetchTeamModels(userID, userRole, accessToken, selectedCreateKeyTeam?.team_id ?? null).then((models) => {
+        let allModels = Array.from(new Set([...(selectedCreateKeyTeam?.models ?? []), ...models]));
         setModelsToPick(allModels);
       });
     }
     form.setFieldValue('models', []);
-  }, [selectedCreateKeyTeam]);
+  }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
 
   // Add a callback function to handle user creation
   const handleUserCreated = (userId: string) => {
@@ -558,7 +569,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                     },
                   ]}
                 >
-                  <InputNumber step={0.01} precision={2} width={200} />
+                  <NumericalInput step={0.01} precision={2} width={200} />
                 </Form.Item>
                 <Form.Item
                   className="mt-4"
@@ -604,7 +615,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                     },
                   ]}
                 >
-                  <InputNumber step={1} width={400} />
+                  <NumericalInput step={1} width={400} />
                 </Form.Item>
                 <Form.Item
                   className="mt-4"
@@ -635,7 +646,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                     },
                   ]}
                 >
-                  <InputNumber step={1} width={400} />
+                  <NumericalInput step={1} width={400} />
                 </Form.Item>
                 <Form.Item
                   label={
@@ -678,6 +689,27 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                     options={guardrailsList.map(name => ({ value: name, label: name }))}
                   />
                 </Form.Item>
+                <Form.Item 
+                      label={
+                        <span>
+                          Allowed Vector Stores{' '}
+                          <Tooltip title="Select which vector stores this key can access. If none selected, the key will have access to all available vector stores">
+                            <InfoCircleOutlined style={{ marginLeft: '4px' }} />
+                          </Tooltip>
+                        </span>
+                      } 
+                      name="allowed_vector_store_ids" 
+                      className="mt-4"
+                      help="Select vector stores this key can access. Leave empty for access to all vector stores"
+                    >
+                      <PremiumVectorStoreSelector
+                        onChange={(values) => form.setFieldValue('allowed_vector_store_ids', values)}
+                        value={form.getFieldValue('allowed_vector_store_ids')}
+                        accessToken={accessToken}
+                        placeholder="Select vector stores (optional)"
+                        premiumUser={premiumUser}
+                      />
+                    </Form.Item>
 
                 <Form.Item 
                   label={
