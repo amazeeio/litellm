@@ -51,8 +51,13 @@ class AmazonBedrockGlobalConfig:
             "ap-northeast-1",  # Asia Pacific (Tokyo)
             "ap-northeast-2",  # Asia Pacific (Seoul)
             "ap-northeast-3",  # Asia Pacific (Osaka)
+<<<<<<< HEAD
             "ap-south-1",      # Asia Pacific (Mumbai)
             "ap-south-2",      # Asia Pacific (Hyderabad)
+=======
+            "ap-south-1",  # Asia Pacific (Mumbai)
+            "ap-south-2",  # Asia Pacific (Hyderabad)
+>>>>>>> BerriAI/main
             "ap-southeast-1",  # Asia Pacific (Singapore)
             "ap-southeast-2",  # Asia Pacific (Sydney)
         ]
@@ -65,6 +70,7 @@ class AmazonBedrockGlobalConfig:
         Source: https://www.aws-services.info/bedrock.html
         """
         return [
+<<<<<<< HEAD
             "eu-west-1",      # Europe (Ireland)
             "eu-west-2",      # Europe (London)
             "eu-west-3",      # Europe (Paris)
@@ -73,6 +79,16 @@ class AmazonBedrockGlobalConfig:
             "eu-south-1",     # Europe (Milan)
             "eu-south-2",     # Europe (Spain)
             "eu-north-1",     # Europe (Stockholm)
+=======
+            "eu-west-1",  # Europe (Ireland)
+            "eu-west-2",  # Europe (London)
+            "eu-west-3",  # Europe (Paris)
+            "eu-central-1",  # Europe (Frankfurt)
+            "eu-central-2",  # Europe (Zurich)
+            "eu-south-1",  # Europe (Milan)
+            "eu-south-2",  # Europe (Spain)
+            "eu-north-1",  # Europe (Stockholm)
+>>>>>>> BerriAI/main
         ]
 
     def get_ca_regions(self) -> List[str]:
@@ -83,9 +99,16 @@ class AmazonBedrockGlobalConfig:
         Source: https://www.aws-services.info/bedrock.html
         """
         return [
+<<<<<<< HEAD
             "us-east-1",      # US East (N. Virginia)
             "us-east-2",      # US East (Ohio)
             "us-west-2",      # US West (Oregon)
+=======
+            "us-east-1",  # US East (N. Virginia)
+            "us-east-2",  # US East (Ohio)
+            "us-west-1",  # US West (N. California)
+            "us-west-2",  # US West (Oregon)
+>>>>>>> BerriAI/main
             "us-gov-east-1",  # AWS GovCloud (US-East)
             "us-gov-west-1",  # AWS GovCloud (US-West)
         ]
@@ -329,7 +352,6 @@ def get_bedrock_tool_name(response_tool_name: str) -> str:
 
 
 class BedrockModelInfo(BaseLLMModelInfo):
-
     global_config = AmazonBedrockGlobalConfig()
     all_global_regions = global_config.get_all_regions()
 
@@ -402,7 +424,9 @@ class BedrockModelInfo(BaseLLMModelInfo):
         return ["us", "eu", "apac"]
 
     @staticmethod
-    def get_bedrock_route(model: str) -> Literal["converse", "invoke", "converse_like"]:
+    def get_bedrock_route(
+        model: str,
+    ) -> Literal["converse", "invoke", "converse_like", "agent"]:
         """
         Get the bedrock route for the given model.
         """
@@ -414,6 +438,8 @@ class BedrockModelInfo(BaseLLMModelInfo):
             return "converse_like"
         elif "converse/" in model:
             return "converse"
+        elif "agent/" in model:
+            return "agent"
         elif (
             base_model in litellm.bedrock_converse_models
             or alt_model in litellm.bedrock_converse_models

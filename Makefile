@@ -14,6 +14,9 @@ help:
 install-dev:
 	poetry install --with dev
 
+install-proxy-dev:
+	poetry install --with dev,proxy-dev
+
 lint: install-dev
 	poetry run pip install types-requests types-setuptools types-redis types-PyYAML
 	cd litellm && poetry run mypy . --ignore-missing-imports
@@ -23,10 +26,10 @@ test:
 	poetry run pytest tests/
 
 test-unit:
-	poetry run pytest tests/litellm/
+	poetry run pytest tests/test_litellm/
 
 test-integration:
-	poetry run pytest tests/ -k "not litellm"
+	poetry run pytest tests/ -k "not test_litellm"
 
 test-unit-helm:
 	helm unittest -f 'tests/*.yaml' deploy/charts/litellm-helm
